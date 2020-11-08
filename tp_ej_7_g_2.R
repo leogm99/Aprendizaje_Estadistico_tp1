@@ -3,8 +3,9 @@ library(ggplot2)
 library(GGally)
 library(ggcorrplot)
 library(multiColl)
+library(leaps)
 
-file <- "/home/leogm99/Escritorio/aprendizaje_estadistico/ejs_practica/Set de datos para los ejercicios-20201106/cemento.txt"
+file <- "cemento.txt"
 
 cemento <- read.table(file, header = TRUE)
 cemento <- cemento[-1]
@@ -40,32 +41,15 @@ summary(reg)
 #aca lo que podemos empezar a buscar son los intervalos de confianza para los bi
 #empezamos por los simples
 X <- model.matrix(reg)
-ic_bis = matrix(0, nrow = ncol(X), ncol = 2) # para todos los bi, i= 0..5
-n <- nrow(X)
-p <- ncol(X)
 
-
-coeffs <- summary(reg)$coefficients[,1]
-std_errs <- summary(reg)$coefficients[,2] ## std.errs /std dev
-n - p 
-t_prob <- qt(p = 1- (0.05 /2), df = n-p)
-for (i in 1:p){
-  ic_bis[i, ] <- c(coeffs[i] - t_prob * std_errs[i],
-                   coeffs[i] + t_prob * std_errs[i])
-}
-
-std_errs[4]
 ic_r <- confint(reg)
-ic_r <- ic_r[-1,] # sin el del intercept
-# todos los bi contienen al cero, no puedo decir nada sobre la significacion 
-# de los coeficientes
-names(reg$coefficients)[-1]
-df2 <- data.frame(cbind(names(reg$coefficients)[-1], ic_r))
+# todos los bi contienen al cero, por lo tanto, no puedo decir absolutamente 
+# nada sobre la significacion de las columnas hasta el momento
+# vemos que el std error de la intercept es muy grande (de todas en general)
 
-#notamos que la suma de las columnas es casi 100 * [1,...,1]
-#esto es un indicio de que hay colinealidad
-rowSums(cemento[1:5])
-residuo <- rep(100, 14) -rowSums(cemento[1:5]) 
+#y ademas notamos que la suma de las columnas es casi 100 * [1,...,1]
+#esto es un indicio de que hay colinealidad (ya que la columna del intercept es casi 100 * la suma de las cols)
+x6 <- rowSums(cemento[1:5])
 #colinealidad: ver seber p. 255
 #si alguno de los autovalores de la matrix de correlacion es cercano a cero
 #entonces la varianza individual de los estimadores bi correspondientes es grande
@@ -103,6 +87,38 @@ x3_vs_x4
 
 #quiero checkear esto haciendo intervalos de confianza simultaneos
 #se que si bj - bi contiene al cero, entonces puede que sean iguales
-#los que quiero testear son b1 - b2 = 0 y b3 - b4 = 0
+#los que quiero testear son b1 + b2 = 0 y b3 + b4 = 0
+#pq asi? pq puede que sean inversamente proporcionales
+
 #por bonferroni
-b_ics <- matrix(0, )
+b_ics <- matrix(0, nrow = 2, ncol = 2)
+c1 <- c(0,0)
+c2 <- c(1,0)
+c3 <- c(1,0)
+c4 <- c(0,1)
+c5 <- c(0,1)
+c6 <- c(0,0)
+C <- cbind(c1, c2, c3, c4, c5, c6)
+s <- summary(reg)$sigma
+q <- 2 #numero de intervalos
+alfa <- 0.05
+t_prob <- qt(p = 1-(alfa / (2 * q)), df = n-p)
+for(i in 1:q){
+  b_ics[i, ] <- c(C[i,]%*%reg$coefficients - t_prob * s * sqrt(t(C[i,])%*%solve(t(X)%*%X)%*%C[i,]),
+                  C[i,]%*%reg$coefficients + t_prob * s * sqrt(t(C[i,])%*%solve(t(X)%*%X)%*%C[i,]))
+}
+
+#vemos que ambos intervalos contienen al 0, pero son muy grandes
+#esto significa que puede ser que sean iguales los coeficientes
+
+#entonces, vimos que la matriz de correlacion es cercana a singular 
+#esto indicaria colinealidad entre las variables 
+#ademas b0 esta consumiendo el problema de que 100* [1,...,1 ] ~= sum(x1 x2 x3 x4 x5)
+#vemos si se justifica eliminar al intercept de la regresion
+
+reg2 <- lm(y ~ . + 0, data = cemento)
+
+#vemos que con el modelo sin intercept, x2, x3 y x4 son significativas para 
+#la regresion, ya que sus p-v < 0.05, mientras que no es el caso con x1(casi) y x5
+
+summary(reg2)

@@ -4,7 +4,7 @@ library(GGally)
 library(ggcorrplot)
 library(multiColl)
 library(leaps)
-
+library("car")
 file <- "cemento.txt"
 
 cemento <- read.table(file, header = TRUE)
@@ -50,6 +50,9 @@ ic_r <- confint(reg)
 #y ademas notamos que la suma de las columnas es casi 100 * [1,...,1]
 #esto es un indicio de que hay colinealidad (ya que la columna del intercept es casi 100 * la suma de las cols)
 x6 <- rowSums(cemento[1:5])
+obs_sum <- data.frame(cbind(c(1:14), x6))
+bar_plot <- ggplot(data = obs_sum, aes(x = V1, y = x6)) + geom_col(fill = "#E69F00") + xlab("Observacion")
+bar_plot + scale_x_continuous(breaks = seq(1, 14, 1)) + geom_abline(intercept = 100, slope = 0, colour = "red") + ylab("Peso total")
 #colinealidad: ver seber p. 255
 #si alguno de los autovalores de la matrix de correlacion es cercano a cero
 #entonces la varianza individual de los estimadores bi correspondientes es grande
@@ -58,6 +61,11 @@ x6 <- rowSums(cemento[1:5])
 #son grandes. Sabemos que las varianzas de los estimadores son grandes cuando
 #hay colinealidad. Esto tambien lo puedo sacar de que la varianza de los estimadores
 #es sigma^2 (xt * x)^-1, si el det de (xt * x)^-1 es muy grande, tambien lo es la var
+
+#el parecido es justificable desde lo practico.
+#cada variable representa el porcentaje del peso de cada componente
+#por lo tanto, estamos en condiciones de estimar a una de las variables en funcion de las otras
+#de modo que es posible dropear al menos una de las columnas.
 
 m <- cor(cemento)
 corr_matriz <- cor(cemento)
@@ -122,3 +130,35 @@ reg2 <- lm(y ~ . + 0, data = cemento)
 #la regresion, ya que sus p-v < 0.05, mientras que no es el caso con x1(casi) y x5
 
 summary(reg2)
+
+# generalmente droppear la intercept es malo
+# el tema es que la suma de los valores es casi 100
+# cada variable es parte de una composicion
+x6
+ggplot(data = reg, aes(x = reg$fitted.values, y = reg$residuals)) + 
+  geom_point() + geom_abline(slope = 0) + xlab("Valores Ajustados") + 
+  ylab("Residuos")
+plot(reg$fitted.values, reg$residuals)
+qqnorm(rstandard(reg))
+qqline(rstandard(reg))
+rstandard(reg)
+reg$residuals
+
+
+reg3 <- lm(y ~ x1 + x3, data = cemento)
+summary(reg3)
+VIF(model.matrix(reg3))
+reg3$fitted.values
+reg3$residuals
+reg$residuals
+
+reg$coefficients
+
+hola <- regsubsets(as.matrix(cemento[1:5]), y = as.matrix(cemento$y), method = "backward", intercept = TRUE)
+summary(hola)$adjr2
+
+best_reg <- lm(y ~ x1 + x2 + x3 + x5, data = cemento)
+summary(best_reg)
+VIF(X[,1:4 ])
+
+rowSums(cemento[1])

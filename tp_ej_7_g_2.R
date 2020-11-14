@@ -4,7 +4,7 @@ library(GGally)
 library(ggcorrplot)
 library(multiColl)
 library(leaps)
-library("car")
+library(xtable)
 file <- "cemento.txt"
 
 cemento <- read.table(file, header = TRUE)
@@ -33,7 +33,21 @@ ggpairs(cemento, upper = list(continuous = wrap("cor", family="sans")))
 #para rechazar la hipotesis nula para cada bi. 
 #Hay que observar tambien que la muestra es muy chica.
 reg <- lm(y ~ ., data = cemento)
-summary(reg)
+summary(reg)$coefficients
+
+
+
+mi_t <- function(x){
+  dt(x=x, df=8)
+}
+#----------graficos de densidad----------#
+
+for(i in 1:6){
+  print(ggplot(data.frame(x=seq(-4, 4, 0.001)), aes(x)) +
+    stat_function(fun = mi_t) + stat_function(fun = mi_t, geom="area", xlim= c(qt(p=.975, df=8), 4),fill="blue", alpha=0.4) +
+    stat_function(fun = mi_t, geom="area", xlim= c(-4, -qt(p=.975, df=8)),fill="blue", alpha=0.4) + 
+    geom_vline(xintercept = summary(reg)$coefficients[i,3], linetype="dotted", color="red", size=0.8) + xlab("t values")) + ylab("Densidad")
+}
 
 #sin embargo vemos que la regresion es significativa, ya que p-v << .05, 5 ordenes 
 #de magnitud menor. Es decir que las variables sirven para explicar y
@@ -50,6 +64,9 @@ ic_r <- confint(reg)
 #y ademas notamos que la suma de las columnas es casi 100 * [1,...,1]
 #esto es un indicio de que hay colinealidad (ya que la columna del intercept es casi 100 * la suma de las cols)
 x6 <- rowSums(cemento[1:5])
+X[,1]
+mean(x6-X[,1])
+cov(x=x6, y=X[,1])
 obs_sum <- data.frame(cbind(c(1:14), x6))
 bar_plot <- ggplot(data = obs_sum, aes(x = V1, y = x6)) + geom_col(fill = "#E69F00") + xlab("Observacion")
 bar_plot + scale_x_continuous(breaks = seq(1, 14, 1)) + geom_abline(intercept = 100, slope = 0, colour = "red") + ylab("Peso total")
@@ -65,7 +82,7 @@ bar_plot + scale_x_continuous(breaks = seq(1, 14, 1)) + geom_abline(intercept = 
 #el parecido es justificable desde lo practico.
 #cada variable representa el porcentaje del peso de cada componente
 #por lo tanto, estamos en condiciones de estimar a una de las variables en funcion de las otras
-#de modo que es posible dropear al menos una de las columnas.
+#de modo que es posible dropear al menos una de las columnas. # esto ultimo no es tan cierto
 
 m <- cor(cemento)
 corr_matriz <- cor(cemento)
@@ -77,6 +94,34 @@ matriz_cemento <- as.matrix(cemento)
 prod(eigen(cor(matriz_cemento))$values) #producto de los autovalores
 
 multiCol(X)
+
+#la matriz de diseño esta mal condicionada, ya que si bien sus columnas no son 
+#combinaciones lineales, estan proximas a serlo (intercept es simil a la suma de x1 a x5)
+
+#dropear la intercept estaria asumiendo que cuando xi = 0 entonces y=0, lo cual
+#desde el punto de vista practico si es cierto, pero tambien es cierto que nuestras 
+#observaciones no contienen a la interseccion. Esto tambien nos dice que estariamos 
+#tratando de extrapolar el origen, lo cual puede introducir variabilidad en el resto de los estimadores.
+
+mean(reg$residuals)
+
+
+#modelo sin intercept
+
+
+reg2 <- lm(y ~ . + 0, data = cemento)
+
+summary(reg2)
+
+ggplot(data = reg, aes(x = reg2$fitted.values, y = reg2$residuals)) + 
+  geom_point() + geom_abline(slope = 0) + xlab("Valores Ajustados") + 
+  ylab("Residuos")
+
+
+qqnorm(rstandard(reg2))
+abline(0,1)
+
+norm(cemento$y - reg$fitted.values, 2)
 
 #para el calculo de vif, se ignora la columna del intercept
 #por lo tanto, problematica involucrando al intercept no se tiene en cuenta
@@ -144,21 +189,44 @@ qqline(rstandard(reg))
 rstandard(reg)
 reg$residuals
 
-
 reg3 <- lm(y ~ x1 + x3, data = cemento)
+
 summary(reg3)
-VIF(model.matrix(reg3))
-reg3$fitted.values
-reg3$residuals
-reg$residuals
+modelos <- leaps(x = as.matrix(cemento[1:5]), y=as.matrix(cemento[6]), int = TRUE, method = c("Cp"))
 
-reg$coefficients
 
-hola <- regsubsets(as.matrix(cemento[1:5]), y = as.matrix(cemento$y), method = "backward", intercept = TRUE)
-summary(hola)$adjr2
+df_cp <- data.frame("Tamaño" = modelos$size, "Cp" = modelos$Cp)
+#busco todos aquellos que tengan cp menor a 6 (sino no tiene ningun sentido)
+#a vista vemos que los mas cercanos son de 4 y de 5 variables
+df_cp <- df_cp[df_cp["Cp"] <= 6,  ]
+plot(x = df_cp$Tamaño, y = df_cp$Cp)
+abline(0,1)
+identify(df_cp)
+modelos$which[19, ]
+modelos$which[30, ]
+modelos$Cp[19]
+modelos$Cp[30]
 
-best_reg <- lm(y ~ x1 + x2 + x3 + x5, data = cemento)
-summary(best_reg)
-VIF(X[,1:4 ])
 
-rowSums(cemento[1])
+modelos_sin_int <- leaps(x = as.matrix(cemento[1:5]), y=as.matrix(cemento[6]), int = FALSE, method = c("Cp"))
+
+df_cp_no_int <- data.frame("Tamaño" = modelos_sin_int$size, "Cp" = modelos_sin_int$Cp)
+
+df_cp_no_int <- df_cp_no_int[df_cp_no_int["Cp"] <= 5, ]
+
+modelos_sin_int$which[16, ]
+
+
+
+
+
+
+
+
+
+
+
+#--------tablas a LaTex--------#
+xtable(cemento)
+xtable(summary(reg)$coefficients)
+summary(reg)

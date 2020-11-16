@@ -193,37 +193,69 @@ reg2 <- lm(y ~ . + 0, data = cemento)
 
 summary(reg2)
 
+intP1<-predict(reg, interval = "prediction", level = 0.95)
+intP2<-predict(reg2,interval = "prediction", level = 0.95)
+
+reg2$fitted.values
+reg$fitted.values
 # generalmente droppear la intercept es malo
 # el tema es que la suma de los valores es casi 100
 # cada variable es parte de una composicion
-x6
+
+#residuos modelo 1 
 ggplot(data = reg, aes(x = reg$fitted.values, y = reg$residuals)) + 
   geom_point() + geom_abline(slope = 0) + xlab("Valores Ajustados") + 
   ylab("Residuos")
-plot(reg$fitted.values, reg$residuals)
 qqnorm(rstandard(reg))
 qqline(rstandard(reg))
 
-rstandard(reg)
-reg$residuals
+sum(reg2$residuals)
+#residuos modelo 2 
+ggplot(data = reg, aes(x = reg2$fitted.values, y = reg2$residuals)) + 
+  geom_point() + geom_abline(slope = 0) + xlab("Valores Ajustados") + 
+  ylab("Residuos") + geom_hline(yintercept = sum(reg2$residuals), linetype = "dotted", colour = "red", size = 0.5)
+qqnorm(rstandard(reg2))
+qqline(rstandard(reg2))
 
-reg3 <- lm(y ~ x1 + x3, data = cemento)
 
+reg3 <- lm(y ~ x2 + x3 + x4, data = cemento)
 summary(reg3)
+#residuos modelo 23
+ggplot(data = reg, aes(x = reg3$fitted.values, y = reg3$residuals)) + 
+  geom_point() + geom_abline(slope = 0) + xlab("Valores Ajustados") + 
+  ylab("Residuos") 
+qqnorm(rstandard(reg3))
+qqline(rstandard(reg3))
+
+
 modelos <- leaps(x = as.matrix(cemento[1:5]), y=as.matrix(cemento[6]), int = TRUE, method = c("Cp"))
 
+plot(modelos$Cp)
+identify(modelos$adjr2)
+modelos$which[19,]
 
 df_cp <- data.frame("Tamaño" = modelos$size, "Cp" = modelos$Cp)
 #busco todos aquellos que tengan cp menor a 6 (sino no tiene ningun sentido)
 #a vista vemos que los mas cercanos son de 4 y de 5 variables
 df_cp <- df_cp[df_cp["Cp"] <= 6,  ]
-plot(x = df_cp$Tamaño, y = df_cp$Cp)
+plot(x = df_cp$Tamaño, y = df_cp$Cp, xlab = "Cantidad de variables", ylab = "Cp")
 abline(0,1)
 identify(df_cp)
 modelos$which[19, ]
 modelos$which[30, ]
 modelos$Cp[19]
 modelos$Cp[30]
+modelos$Cp[6]
+best_cp <- lm(y ~ x2 + x3 + x5, data = cemento)
+summary(best_cp)
+VIF(model.matrix(best_cp))
+
+ggplot(data = reg, aes(x = best_cp$fitted.values, y = best_cp$residuals)) + 
+  geom_point() + geom_abline(slope = 0) + xlab("Valores Ajustados") + 
+  ylab("Residuos") 
+qqnorm(rstandard(best_cp))
+qqline(rstandard(best_cp))
+
 
 
 modelos_sin_int <- leaps(x = as.matrix(cemento[1:5]), y=as.matrix(cemento[6]), int = FALSE, method = c("Cp"))
@@ -234,23 +266,64 @@ df_cp_no_int <- df_cp_no_int[df_cp_no_int["Cp"] <= 5, ]
 
 modelos_sin_int$which[16, ]
 
+reg_x1_x2 <- lm(x2 ~ x1, data = cemento)
+reg_x3_x4 <- lm(x4 ~ x3, data = cemento)
+
+summary(reg_x3_x4)
+
+#relacion x3 x4
+
+intc <- predict(reg_x3_x4, interval = "confidence", level = 0.95)
+intp <- predict(reg_x3_x4, interval = "prediction", level = 0.95)
+intc <- intc[, -1]
+intp <- intp[, -1]
+cemento[2:3]
+intervalos<-data.frame(cbind(cemento[3:4],intc,intp))
 
 
+g<-ggplot(intervalos)+
+  geom_point(aes(x=x3,y=x4))+
+  geom_line(aes(x=x3,y = lwr), col="skyblue")+
+  geom_line(aes(x=x3,y=upr), col="skyblue")+
+  geom_line(aes(x=x3,y=lwr.1), col="chocolate",lty=4)+
+  geom_line(aes(x=x3,y=upr.1), col="chocolate",lty=4)+
+  geom_smooth(aes(x=x3,y=x4),method="lm", col="firebrick",se=FALSE)+
+  labs(y="x4", x="x3")+
+  theme_light()
+g
+
+#relacion x1 x2
+
+intc <- predict(reg_x1_x2, interval = "confidence", level = 0.95)
+intp <- predict(reg_x1_x2, interval = "prediction", level = 0.95)
+intc <- intc[, -1]
+intp <- intp[, -1]
+cemento[2:3]
+intervalos<-data.frame(cbind(cemento[1:2],intc,intp))
 
 
+g<-ggplot(intervalos)+
+  geom_point(aes(x=x1,y=x2))+
+  geom_line(aes(x=x1,y = lwr), col="skyblue")+
+  geom_line(aes(x=x1,y=upr), col="skyblue")+
+  geom_line(aes(x=x1,y=lwr.1), col="chocolate",lty=4)+
+  geom_line(aes(x=x1,y=upr.1), col="chocolate",lty=4)+
+  geom_smooth(aes(x=x1,y=x2),method="lm", col="firebrick",se=FALSE)+
+  labs(y="x2", x="x1")+
+  theme_light()
+g
 
-
-
-
-qf(2.48e-07, lower.tail = FALSE, df1 = 5, df2=8)
 
 #--------tablas a LaTex--------#
 xtable(cemento)
 xtable(summary(reg))
 xtable(as.matrix(summary(reg)$fstatistic))
 xtable(as.matrix(VIF(model.matrix(reg))))
+xtable(as.matrix(summary(reg2)$fstatistic))
 VIF(model.matrix(reg2))
 xtable(summary(reg2)$coeff)
-
-
-
+summary(reg2)$coeff
+xtable(summary(reg3))
+xtable(summary(reg_x3_x4))
+xtable(summary(best_cp))
+xtable(as.matrix(summary(best_cp)$fstatistic))

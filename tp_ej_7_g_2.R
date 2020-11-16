@@ -1,4 +1,5 @@
 # cemento.txt
+
 library(ggplot2)
 library(GGally)
 library(ggcorrplot)
@@ -40,6 +41,11 @@ summary(reg)$coefficients
 mi_t <- function(x){
   dt(x=x, df=8)
 }
+
+mi_f <- function(x){
+  df(x=x, df1=5, df2=8)
+}
+
 #----------graficos de densidad----------#
 
 for(i in 1:6){
@@ -49,6 +55,9 @@ for(i in 1:6){
     geom_vline(xintercept = summary(reg)$coefficients[i,3], linetype="dotted", color="red", size=0.8) + xlab("t values")) + ylab("Densidad")
 }
 
+ggplot(data.frame(x=seq(0, 130, 0.0001)), aes(x)) +
+        stat_function(fun = mi_f) + stat_function(fun = mi_f, geom="area", xlim= c(qf(p=.95, df1=5, df2=8), 130),fill="blue", alpha=0.4) +
+        geom_vline(xintercept = summary(reg)$fstatistic[1], linetype="dotted", color="red", size=0.8) + xlab("F values") + ylab("Densidad")
 #sin embargo vemos que la regresion es significativa, ya que p-v << .05, 5 ordenes 
 #de magnitud menor. Es decir que las variables sirven para explicar y
 
@@ -57,6 +66,10 @@ for(i in 1:6){
 X <- model.matrix(reg)
 
 ic_r <- confint(reg)
+ic_r <- ic_r[-1,] #dropeo el intervalo de la intercept porque es muy grande en relacion con el resto
+
+
+
 # todos los bi contienen al cero, por lo tanto, no puedo decir absolutamente 
 # nada sobre la significacion de las columnas hasta el momento
 # vemos que el std error de la intercept es muy grande (de todas en general)
@@ -68,8 +81,8 @@ X[,1]
 mean(x6-X[,1])
 cov(x=x6, y=X[,1])
 obs_sum <- data.frame(cbind(c(1:14), x6))
-bar_plot <- ggplot(data = obs_sum, aes(x = V1, y = x6)) + geom_col(fill = "#E69F00") + xlab("Observacion")
-bar_plot + scale_x_continuous(breaks = seq(1, 14, 1)) + geom_abline(intercept = 100, slope = 0, colour = "red") + ylab("Peso total")
+bar_plot <- ggplot(data = obs_sum, aes(x = V1, y = x6)) + geom_col(fill = "#E69F00") + xlab("Observación")
+bar_plot + scale_x_continuous(breaks = seq(1, 14, 1)) + geom_abline(intercept = 100, slope = 0, colour = "red", size=1.) + ylab("Suma de porcentajes")
 #colinealidad: ver seber p. 255
 #si alguno de los autovalores de la matrix de correlacion es cercano a cero
 #entonces la varianza individual de los estimadores bi correspondientes es grande
@@ -78,6 +91,10 @@ bar_plot + scale_x_continuous(breaks = seq(1, 14, 1)) + geom_abline(intercept = 
 #son grandes. Sabemos que las varianzas de los estimadores son grandes cuando
 #hay colinealidad. Esto tambien lo puedo sacar de que la varianza de los estimadores
 #es sigma^2 (xt * x)^-1, si el det de (xt * x)^-1 es muy grande, tambien lo es la var
+
+
+#inflacion de la varianza
+VIF(model.matrix(reg))
 
 #el parecido es justificable desde lo practico.
 #cada variable representa el porcentaje del peso de cada componente
@@ -186,6 +203,7 @@ ggplot(data = reg, aes(x = reg$fitted.values, y = reg$residuals)) +
 plot(reg$fitted.values, reg$residuals)
 qqnorm(rstandard(reg))
 qqline(rstandard(reg))
+
 rstandard(reg)
 reg$residuals
 
@@ -224,9 +242,15 @@ modelos_sin_int$which[16, ]
 
 
 
-
+qf(2.48e-07, lower.tail = FALSE, df1 = 5, df2=8)
 
 #--------tablas a LaTex--------#
 xtable(cemento)
-xtable(summary(reg)$coefficients)
-summary(reg)
+xtable(summary(reg))
+xtable(as.matrix(summary(reg)$fstatistic))
+xtable(as.matrix(VIF(model.matrix(reg))))
+VIF(model.matrix(reg2))
+xtable(summary(reg2)$coeff)
+
+
+
